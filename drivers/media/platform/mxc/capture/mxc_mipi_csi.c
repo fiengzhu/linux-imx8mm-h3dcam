@@ -55,8 +55,10 @@ MODULE_PARM_DESC(debug, "Debug level (0-2)");
 #define CSIS0_MAX_LANES		4
 #define CSIS1_MAX_LANES		2
 
-#define MIPI_CSIS_DEF_PIX_WIDTH	640
-#define MIPI_CSIS_DEF_PIX_HEIGHT	480
+// #define MIPI_CSIS_DEF_PIX_WIDTH	640
+// #define MIPI_CSIS_DEF_PIX_HEIGHT	480
+#define MIPI_CSIS_DEF_PIX_WIDTH	2592
+#define MIPI_CSIS_DEF_PIX_HEIGHT	1944
 
 /* Register map definition */
 
@@ -139,6 +141,8 @@ MODULE_PARM_DESC(debug, "Debug level (0-2)");
 #define MIPI_CSIS_DPHYCTRL_ENABLE_CLK		(1 << 0)
 #define MIPI_CSIS_DPHYCTRL_ENABLE			(0x1f << 0)
 
+
+
 /* D-PHY Master and Slave Control register Low */
 #define MIPI_CSIS_DPHYBCTRL_L		0x30
 /* D-PHY Master and Slave Control register High */
@@ -160,6 +164,7 @@ MODULE_PARM_DESC(debug, "Debug level (0-2)");
 #define MIPI_CSIS_ISPCFG_DOUBLE_CMPNT        (1 << 12)
 #define MIPI_CSIS_ISPCFG_ALIGN_32BIT         (1 << 11)
 #define MIPI_CSIS_ISPCFG_FMT_YCBCR422_8BIT   (0x1e << 2)
+#define MIPI_CSIS_ISPCFG_FMT_RGB888		(0x24 << 2)
 #define MIPI_CSIS_ISPCFG_FMT_RAW8		(0x2a << 2)
 #define MIPI_CSIS_ISPCFG_FMT_RAW10		(0x2b << 2)
 #define MIPI_CSIS_ISPCFG_FMT_RAW12		(0x2c << 2)
@@ -318,11 +323,20 @@ struct csis_pix_format {
 	u8 data_alignment;
 };
 
+
 static const struct csis_pix_format mipi_csis_formats[] = {
 	{
-		.code = MEDIA_BUS_FMT_YUYV8_2X8,
-		.fmt_reg = MIPI_CSIS_ISPCFG_FMT_YCBCR422_8BIT,
-		.data_alignment = 16,
+		.code = MEDIA_BUS_FMT_RGB888_1X24,
+		.fmt_reg = MIPI_CSIS_ISPCFG_FMT_RGB888,
+		.data_alignment = 24,
+	}, {
+		.code = MEDIA_BUS_FMT_BGR888_1X24,
+		.fmt_reg = MIPI_CSIS_ISPCFG_FMT_RGB888,
+		.data_alignment = 24,
+	}, {
+		.code = MEDIA_BUS_FMT_RGB888_1X32_PADHI,
+		.fmt_reg = MIPI_CSIS_ISPCFG_FMT_RGB888,
+		.data_alignment = 32,
 	}, {
 		.code = MEDIA_BUS_FMT_VYUY8_2X8,
 		.fmt_reg = MIPI_CSIS_ISPCFG_FMT_YCBCR422_8BIT,
@@ -331,6 +345,18 @@ static const struct csis_pix_format mipi_csis_formats[] = {
 		.code = MEDIA_BUS_FMT_SBGGR8_1X8,
 		.fmt_reg = MIPI_CSIS_ISPCFG_FMT_RAW8,
 		.data_alignment = 8,
+	}, {
+		.code = MEDIA_BUS_FMT_YUYV8_2X8,
+		.fmt_reg = MIPI_CSIS_ISPCFG_FMT_YCBCR422_8BIT,
+		.data_alignment = 16,
+	}, {
+		.code = MEDIA_BUS_FMT_SGRBG8_1X8,
+		.fmt_reg = MIPI_CSIS_ISPCFG_FMT_RAW8,
+		.data_alignment = 8,
+	}, {
+		.code = MEDIA_BUS_FMT_SGRBG10_1X10,
+		.fmt_reg = MIPI_CSIS_ISPCFG_FMT_RAW10,
+		.data_alignment = 16,
 	}
 };
 
@@ -367,6 +393,7 @@ static void mipi_csis_enable_interrupts(struct csi_state *state, bool on)
 		val |= 0xf00fffff;
 	else
 		val &= ~0xf00fffff;
+
 	mipi_csis_write(state, MIPI_CSIS_INTMSK, val);
 }
 
@@ -488,6 +515,9 @@ static void __mipi_csis_set_format(struct csi_state *state)
 	val = (val & ~MIPI_CSIS_ISPCFG_FMT_MASK) | state->csis_fmt->fmt_reg;
 	mipi_csis_write(state, MIPI_CSIS_ISPCONFIG_CH0, val);
 
+	v4l2_info(&state->mipi_sd, "csi fmt: %#x, %#x, %d x %d\n",
+		 state->csis_fmt->fmt_reg, mf->code, mf->width, mf->height);
+
 	/* Pixel resolution */
 	val = mf->width | (mf->height << 16);
 	mipi_csis_write(state, MIPI_CSIS_ISPRESOL_CH0, val);
@@ -533,11 +563,15 @@ static void mipi_csis_set_params(struct csi_state *state)
 	val &= ~MIPI_CSIS_CLK_CTRL_WCLK_SRC;
 	if (state->wclk_ext)
 		val |= MIPI_CSIS_CLK_CTRL_WCLK_SRC;
-	val |= MIPI_CSIS_CLK_CTRL_CLKGATE_TRAIL_CH0(15);
+	val |= MIPI_CSIS_CLK_CTRL_CLKGATE_TRAIL_CH0(15); 
 	val &= ~MIPI_CSIS_CLK_CTRL_CLKGATE_EN_MSK;
+
+	//v4l2_info(&state->mipi_sd, "clock setting is 0x%x", val);
+
 	mipi_csis_write(state, MIPI_CSIS_CLK_CTRL, val);
 
 	mipi_csis_write(state, MIPI_CSIS_DPHYBCTRL_L, 0x1f4);
+	//mipi_csis_write(state, MIPI_CSIS_DPHYBCTRL_L, 0x8011f4); // Yuefeng new setting
 	mipi_csis_write(state, MIPI_CSIS_DPHYBCTRL_H, 0);
 
 	/* Update the shadow register. */
@@ -625,7 +659,7 @@ static void dump_regs(struct csi_state *state, const char *label)
 	};
 	u32 i;
 
-	v4l2_info(&state->mipi_sd, "--- %s ---\n", label);
+	//v4l2_info(&state->mipi_sd, "--- %s ---\n", label);
 
 	for (i = 0; i < ARRAY_SIZE(registers); i++) {
 		u32 cfg = mipi_csis_read(state, registers[i].offset);
@@ -635,6 +669,8 @@ static void dump_regs(struct csi_state *state, const char *label)
 
 static void mipi_csis_start_stream(struct csi_state *state)
 {
+	//v4l2_info(&state->mipi_sd, "mipi_csis_start_stream enterred");
+
 	mipi_csis_sw_reset(state);
 	mipi_csis_set_params(state);
 	mipi_csis_system_enable(state, true);
@@ -693,7 +729,7 @@ static int mipi_csis_s_power(struct v4l2_subdev *mipi_sd, int on)
 static int mipi_csis_s_stream(struct v4l2_subdev *mipi_sd, int enable)
 {
 	struct csi_state *state = mipi_sd_to_csi_state(mipi_sd);
-	int ret = 0;
+	unsigned int ret = 0;
 
 	v4l2_dbg(1, debug, mipi_sd, "%s: %d, state: 0x%x\n",
 		 __func__, enable, state->flags);
@@ -702,7 +738,11 @@ static int mipi_csis_s_stream(struct v4l2_subdev *mipi_sd, int enable)
 		mipi_csis_clear_counters(state);
 		ret = pm_runtime_get_sync(&state->pdev->dev);
 		if (ret && ret != 1)
+		{
+			v4l2_err(mipi_sd, "runtime sync err 0x%x\n", ret);
 			return ret;
+		}
+			
 	}
 
 	mutex_lock(&state->lock);
@@ -711,9 +751,14 @@ static int mipi_csis_s_stream(struct v4l2_subdev *mipi_sd, int enable)
 			ret = -EBUSY;
 			goto unlock;
 		}
-		mipi_csis_start_stream(state);
-		v4l2_subdev_call(state->sensor_sd, video, s_stream, true);
-		state->flags |= ST_STREAMING;
+		
+		// if streaming is already on, don't call streamOn function again
+		if ((state->flags & ST_STREAMING) == 0)
+		{
+			mipi_csis_start_stream(state);	
+			v4l2_subdev_call(state->sensor_sd, video, s_stream, true);
+			state->flags |= ST_STREAMING;
+		}
 	} else {
 		v4l2_subdev_call(state->sensor_sd, video, s_stream, false);
 		mipi_csis_stop_stream(state);
@@ -721,11 +766,12 @@ static int mipi_csis_s_stream(struct v4l2_subdev *mipi_sd, int enable)
 		if (debug > 0)
 			mipi_csis_log_counters(state, true);
 	}
+
 unlock:
 	mutex_unlock(&state->lock);
 	if (!enable)
 		pm_runtime_put(&state->pdev->dev);
-
+	
 	return ret == 1 ? 0 : ret;
 }
 
@@ -744,7 +790,7 @@ static int mipi_csis_enum_mbus_code(struct v4l2_subdev *mipi_sd,
 
 	csis_fmt = find_csis_format(code->code);
 	if (csis_fmt == NULL) {
-		dev_err(state->dev, "format not match\n");
+		dev_err(state->dev, "format not match, request code %x\n", code->code);
 		return -EINVAL;
 	}
 
@@ -767,6 +813,7 @@ static int mipi_csis_set_fmt(struct v4l2_subdev *mipi_sd,
 	if (csis_fmt == NULL)
 		csis_fmt = &mipi_csis_formats[0];
 
+	//dev_info(state->dev, "h3d:mipi_csis_set_fmt setting format.\n");
 	v4l2_subdev_call(sensor_sd, pad, set_fmt, NULL, format);
 
 	mf->code = csis_fmt->code;
@@ -775,8 +822,10 @@ static int mipi_csis_set_fmt(struct v4l2_subdev *mipi_sd,
 			      &mf->height, 1, CSIS_MAX_PIX_HEIGHT, 1,
 			      0);
 
-	if (format->which == V4L2_SUBDEV_FORMAT_TRY)
-		return 0;
+	// Yuefeng commented
+	//if (format->which == V4L2_SUBDEV_FORMAT_TRY)
+	//	return 0;
+	// comment end
 
 	state->format.code = mf->code;
 	state->format.width = mf->width;
@@ -799,6 +848,7 @@ static int mipi_csis_get_fmt(struct v4l2_subdev *mipi_sd,
 	if (format->pad)
 		return -EINVAL;
 
+	//dev_info(state->dev, "h3d:mipi_csis_get_fmt getting format.\n");
 	return v4l2_subdev_call(sensor_sd, pad, get_fmt, NULL, format);
 }
 
@@ -901,6 +951,7 @@ static irqreturn_t mipi_csis_irq_handler(int irq, void *dev_id)
 	u32 status;
 
 	status = mipi_csis_read(state, MIPI_CSIS_INTSRC);
+	//v4l2_info(&state->mipi_sd, "interrupt 0x%x, status=0x%x\n", irq, status);
 
 	spin_lock_irqsave(&state->slock, flags);
 
@@ -1066,6 +1117,8 @@ static int mipi_csis_subdev_init(struct v4l2_subdev *mipi_sd,
 	if (ret < 0)
 		dev_err(&pdev->dev, "%s--Async register faialed, ret=%d\n", __func__, ret);
 
+	dev_info(&pdev->dev, "subdev init finished with %dx%d, code %x\n", state->format.width, state->format.height, state->format.code);
+
 	return ret;
 }
 
@@ -1140,7 +1193,7 @@ static int mipi_csis_probe(struct platform_device *pdev)
 			"Unable to register v4l2 device.\n");
 		goto e_clkdis;
 	}
-	v4l2_info(&state->v4l2_dev, "mipi csi v4l2 device registered\n");
+	//v4l2_info(&state->v4l2_dev, "mipi csi v4l2 device registered\n");
 
 	/* .. and a pointer to the subdev. */
 	platform_set_drvdata(pdev, state);

@@ -618,7 +618,7 @@
 };
 
 &i2c4 {
-	clock-frequency = <400000>;
+	clock-frequency = <100000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c4>;
 	status = "okay";
@@ -630,34 +630,60 @@
 		status = "okay";
 	};
 
-	ov5640_mipi: ov5640_mipi@3c {
-		compatible = "ovti,ov5640_mipi";
+	avt_csi2@3c {
+		compatible = "alliedvision,avt_csi2";
 		reg = <0x3c>;
-		status = "okay";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_csi1>;
-		clocks = <&clk IMX8MM_CLK_CLKO1_DIV>;
-		clock-names = "csi_mclk";
-		assigned-clocks = <&clk IMX8MM_CLK_CLKO1_SRC>,
-				  <&clk IMX8MM_CLK_CLKO1_DIV>;
-		assigned-clock-parents = <&clk IMX8MM_CLK_24M>;
-		assigned-clock-rates = <0>, <24000000>;
-		csi_id = <0>;
-		/*
-		To be looked into & fixed
-		As of now the device is alwas out of reset & under the power
-		*/
-		pwn-gpios = <&pca9555 8 GPIO_ACTIVE_LOW>;
-		rst-gpios = <&pca9555 3 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+		csi_clk_freq = <600000000>;
+		data-lanes = <2>;
+		//virtual-channel;
 
-		mclk = <24000000>;
-		mclk_source = <0>;
+		// clocks = <&clk IMX8MM_CLK_CLKO1_DIV>;
+		// clock-names = "csi_mclk";
+		// assigned-clocks = <&clk IMX8MM_CLK_CLKO1_SRC>,
+		// 		  <&clk IMX8MM_CLK_CLKO1_DIV>;
+		// assigned-clock-parents = <&clk IMX8MM_CLK_24M>;
+		// assigned-clock-rates = <0>, <250000000>;
+		// csi_id = <0>;
+
 		port {
-			ov5640_mipi1_ep: endpoint {
+			avt_csi2_ep: endpoint {
 				remote-endpoint = <&mipi1_sensor_ep>;
 			};
 		};
 	};
+
+	// ov5640_mipi: ov5640_mipi@3c {
+	// 	compatible = "ovti,ov5640_mipi";
+	// 	reg = <0x3c>;
+	// 	status = "okay";
+	// 	pinctrl-names = "default";
+	// 	pinctrl-0 = <&pinctrl_csi1>;
+	// 	clocks = <&clk IMX8MM_CLK_CLKO1_DIV>;
+	// 	clock-names = "csi_mclk";
+	// 	assigned-clocks = <&clk IMX8MM_CLK_CLKO1_SRC>,
+	// 			  <&clk IMX8MM_CLK_CLKO1_DIV>;
+	// 	assigned-clock-parents = <&clk IMX8MM_CLK_24M>;
+	// 	assigned-clock-rates = <0>, <24000000>;
+	// 	csi_id = <0>;
+	// 	/*
+	// 	To be looked into & fixed
+	// 	As of now the device is alwas out of reset & under the power
+	// 	*/
+	// 	pwn-gpios = <&pca9555 8 GPIO_ACTIVE_LOW>;
+	// 	rst-gpios = <&pca9555 3 GPIO_ACTIVE_HIGH>;
+
+	// 	mclk = <24000000>;
+	// 	mclk_source = <0>;
+	// 	port {
+	// 		ov5640_mipi1_ep: endpoint {
+	// 			remote-endpoint = <&mipi1_sensor_ep>;
+	// 		};
+	// 	};
+	// };
+
 	goodix_ts@5d {
 		compatible = "goodix,gt911";
 		reg = <0x5d>;
@@ -678,14 +704,25 @@
 &mipi_csi_1 {
 	#address-cells = <1>;
 	#size-cells = <0>;
+	/delete-property/virtual-channel;
+	clock-frequency = <600000000>;
 	status = "okay";
+
 	port {
+		// mipi1_sensor_ep: endpoint1 {
+		// 	remote-endpoint = <&ov5640_mipi1_ep>;
+		// 	data-lanes = <2>;
+		// 	csis-hs-settle = <13>;
+		// 	csis-clk-settle = <2>;
+		// 	csis-wclk;
+		// };
+
 		mipi1_sensor_ep: endpoint1 {
-			remote-endpoint = <&ov5640_mipi1_ep>;
 			data-lanes = <2>;
-			csis-hs-settle = <13>;
-			csis-clk-settle = <2>;
-			csis-wclk;
+			remote-endpoint = <&avt_csi2_ep>;
+			csis-hs-settle = <33>;
+			csis-clk-settle = <0>;
+			//csis-wclk;
 		};
 
 		csi1_mipi_ep: endpoint2 {

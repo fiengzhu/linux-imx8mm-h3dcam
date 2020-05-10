@@ -1,3 +1,10 @@
+/* 
+ * H3D Inc. 
+ * This driver is writen based on Allied Vision CSI2 driver, beta version
+ * This driver is target at Allied Vision camera Alvium 1500 C-500m/c, which is based on 5M-pixel On Semiconductor AR0521SR sensor
+ * Created and Modified by Yuefeng, 05/10/2020
+ */
+
 #ifndef __AVT_CSI2_H__
 #define __AVT_CSI2_H__
 

@@ -161,7 +161,9 @@ MODULE_PARM_DESC(debug, "Debug level (0-2)");
 
 #define MIPI_CSIS_ISPCFG_MEM_FULL_GAP_MSK    (0xff << 24)
 #define MIPI_CSIS_ISPCFG_MEM_FULL_GAP(x)     (x << 24)
-#define MIPI_CSIS_ISPCFG_DOUBLE_CMPNT        (1 << 12)
+//#define MIPI_CSIS_ISPCFG_DOUBLE_CMPNT        (1 << 12)
+#define MIPI_CSIS_ISPCFG_PIXEL_MODE_MSK		 (0x03 << 12)
+#define MIPI_CSIS_ISPCFG_PIXEL_MODE(x)       (x << 12)
 #define MIPI_CSIS_ISPCFG_ALIGN_32BIT         (1 << 11)
 #define MIPI_CSIS_ISPCFG_FMT_YCBCR422_8BIT   (0x1e << 2)
 #define MIPI_CSIS_ISPCFG_FMT_RGB888		(0x24 << 2)
@@ -292,6 +294,8 @@ struct csi_state {
 	u32 num_lanes;
 	u32 max_num_lanes;
 	u8 wclk_ext;
+
+	u8 sw_reset_done; // Yuefeng, 05/09/2020
 
 	const struct csis_pix_format *csis_fmt;
 	struct v4l2_mbus_framefmt format;
@@ -548,10 +552,15 @@ static void mipi_csis_set_params(struct csi_state *state)
 	mipi_csis_set_hsync_settle(state, state->hs_settle, state->clk_settle);
 
 	val = mipi_csis_read(state, MIPI_CSIS_ISPCONFIG_CH0);
-	if (state->csis_fmt->data_alignment == 32)
-		val |= MIPI_CSIS_ISPCFG_ALIGN_32BIT;
-	else /* Normal output */
+
+	// force to normal mode, Yuefeng, 05/09/2020
+	//if (state->csis_fmt->data_alignment == 32)
+	//	val |= MIPI_CSIS_ISPCFG_ALIGN_32BIT;
+	//else /* Normal output */
 		val &= ~MIPI_CSIS_ISPCFG_ALIGN_32BIT;
+
+	val |= MIPI_CSIS_ISPCFG_PIXEL_MODE(0) & MIPI_CSIS_ISPCFG_PIXEL_MODE_MSK;
+
 	mipi_csis_write(state, MIPI_CSIS_ISPCONFIG_CH0, val);
 
 	val = (0 << MIPI_CSIS_ISPSYNC_HSYNC_LINTV_OFFSET) |
@@ -566,12 +575,9 @@ static void mipi_csis_set_params(struct csi_state *state)
 	val |= MIPI_CSIS_CLK_CTRL_CLKGATE_TRAIL_CH0(15); 
 	val &= ~MIPI_CSIS_CLK_CTRL_CLKGATE_EN_MSK;
 
-	//v4l2_info(&state->mipi_sd, "clock setting is 0x%x", val);
-
 	mipi_csis_write(state, MIPI_CSIS_CLK_CTRL, val);
 
 	mipi_csis_write(state, MIPI_CSIS_DPHYBCTRL_L, 0x1f4);
-	//mipi_csis_write(state, MIPI_CSIS_DPHYBCTRL_L, 0x8011f4); // Yuefeng new setting
 	mipi_csis_write(state, MIPI_CSIS_DPHYBCTRL_H, 0);
 
 	/* Update the shadow register. */
@@ -669,8 +675,6 @@ static void dump_regs(struct csi_state *state, const char *label)
 
 static void mipi_csis_start_stream(struct csi_state *state)
 {
-	//v4l2_info(&state->mipi_sd, "mipi_csis_start_stream enterred");
-
 	mipi_csis_sw_reset(state);
 	mipi_csis_set_params(state);
 	mipi_csis_system_enable(state, true);
@@ -753,6 +757,7 @@ static int mipi_csis_s_stream(struct v4l2_subdev *mipi_sd, int enable)
 		}
 		
 		// if streaming is already on, don't call streamOn function again
+		// Yuefeng, 05/09/2020		
 		if ((state->flags & ST_STREAMING) == 0)
 		{
 			mipi_csis_start_stream(state);	
@@ -813,7 +818,6 @@ static int mipi_csis_set_fmt(struct v4l2_subdev *mipi_sd,
 	if (csis_fmt == NULL)
 		csis_fmt = &mipi_csis_formats[0];
 
-	//dev_info(state->dev, "h3d:mipi_csis_set_fmt setting format.\n");
 	v4l2_subdev_call(sensor_sd, pad, set_fmt, NULL, format);
 
 	mf->code = csis_fmt->code;
@@ -848,7 +852,6 @@ static int mipi_csis_get_fmt(struct v4l2_subdev *mipi_sd,
 	if (format->pad)
 		return -EINVAL;
 
-	//dev_info(state->dev, "h3d:mipi_csis_get_fmt getting format.\n");
 	return v4l2_subdev_call(sensor_sd, pad, get_fmt, NULL, format);
 }
 
@@ -951,7 +954,6 @@ static irqreturn_t mipi_csis_irq_handler(int irq, void *dev_id)
 	u32 status;
 
 	status = mipi_csis_read(state, MIPI_CSIS_INTSRC);
-	//v4l2_info(&state->mipi_sd, "interrupt 0x%x, status=0x%x\n", irq, status);
 
 	spin_lock_irqsave(&state->slock, flags);
 
@@ -1193,7 +1195,6 @@ static int mipi_csis_probe(struct platform_device *pdev)
 			"Unable to register v4l2 device.\n");
 		goto e_clkdis;
 	}
-	//v4l2_info(&state->v4l2_dev, "mipi csi v4l2 device registered\n");
 
 	/* .. and a pointer to the subdev. */
 	platform_set_drvdata(pdev, state);
@@ -1203,6 +1204,8 @@ static int mipi_csis_probe(struct platform_device *pdev)
 		goto e_sd_mipi;
 
 	memcpy(state->events, mipi_csis_events, sizeof(state->events));
+
+	state->sw_reset_done = 0; // initialate reset status; Yuefeng 05/09/2020
 
 	/* subdev host register */
 	ret = mipi_csis_subdev_host(state);

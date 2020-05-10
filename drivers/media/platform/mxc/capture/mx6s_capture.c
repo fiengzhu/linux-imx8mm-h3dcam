@@ -496,10 +496,6 @@ static void csisw_reset(struct mx6s_csi_dev *csi_dev)
 	isr = csi_read(csi_dev, CSI_CSISR);
 	csi_write(csi_dev, isr, CSI_CSISR);
 
-	/*if ((cr18 & (0xff << 25)) == BIT_MIPI_DATA_FORMAT_RGB888)
-		cr18 |= csi_dev->soc->baseaddr_switch;
-	else
-		cr18 &= ~csi_dev->soc->baseaddr_switch;*/
 	cr18 |= csi_dev->soc->baseaddr_switch;
 
 	/* Enable csi  */
@@ -654,7 +650,7 @@ static void csi_dmareq_rff_disable(struct mx6s_csi_dev *csi_dev)
 static void csi_set_imagpara(struct mx6s_csi_dev *csi,
 					int width, int height)
 {
-	int imag_para = 0;
+	unsigned int imag_para = 0;
 	unsigned long cr3 = __raw_readl(csi->regbase + CSI_CSICR3);
 
 	imag_para = (width << 16) | height;
@@ -761,9 +757,6 @@ static void mx6s_videobuf_queue(struct vb2_buffer *vb)
 	dev_dbg(csi_dev->dev, "%s (vb=0x%p) 0x%p %lu\n", __func__,
 		vb, vb2_plane_vaddr(vb, 0), vb2_get_plane_payload(vb, 0));
 
-	//dev_info(csi_dev->dev, "h3d %s (vb=0x%p) 0x%p %lu\n", __func__,
-	//	vb, vb2_plane_vaddr(vb, 0), vb2_get_plane_payload(vb, 0));
-
 	spin_lock_irqsave(&csi_dev->slock, flags);
 
 	list_add_tail(&buf->internal.queue, &csi_dev->capture);
@@ -806,8 +799,6 @@ static int mx6s_csi_enable(struct mx6s_csi_dev *csi_dev)
 	csi_dev->skipframe = 0;
 	csisw_reset(csi_dev);
 
-	//dev_info(csi_dev->dev, "h3d: mx6s_csi_enable entered");
-
 	if (pix->field == V4L2_FIELD_INTERLACED)
 		csi_tvdec_enable(csi_dev, true);
 
@@ -818,8 +809,6 @@ static int mx6s_csi_enable(struct mx6s_csi_dev *csi_dev)
 		csi_enable(csi_dev, 1);
 		return 0;
 	}
-
-	//dev_info(csi_dev->dev, "h3d: mx6s_csi_enable start");
 
 	local_irq_save(flags);
 	for (timeout = 10000000; timeout > 0; timeout--) {
@@ -858,7 +847,6 @@ static int mx6s_csi_enable(struct mx6s_csi_dev *csi_dev)
 	}
 	local_irq_restore(flags);
 
-	//dev_info(csi_dev->dev, "h3d: mx6s_csi_enable successful");
 	return 0;
 }
 
@@ -926,9 +914,8 @@ static int mx6s_configure_csi(struct mx6s_csi_dev *csi_dev)
 		return -EINVAL;
 	}
 
-	pr_info("mx6s_configure_csi=> h3d: set image format:%d, %d", width, pix->height);
 	csi_set_imagpara(csi_dev, width, pix->height);
-
+	
 	if (csi_dev->csi_mipi_mode == true) {
 		cr1 = csi_read(csi_dev, CSI_CSICR1);
 		cr1 &= ~BIT_GCLK_MODE;
@@ -965,7 +952,6 @@ static int mx6s_configure_csi(struct mx6s_csi_dev *csi_dev)
 			return -EINVAL;
 		}
 
-		pr_info("mx6s_configure_csi=> h3d: csi_cr18_write write:%x", cr18);
 		csi_write(csi_dev, cr18, CSI_CSICR18);
 	}
 	return 0;
@@ -979,11 +965,8 @@ static int mx6s_start_streaming(struct vb2_queue *vq, unsigned int count)
 	unsigned long phys;
 	unsigned long flags;
 
-	//pr_info("mx6s_configure_csi=> h3d: mx6s_start_streaming enterted 0 ");
 	if (count < 2)
 		return -ENOBUFS;
-
-	//pr_info("mx6s_configure_csi=> h3d: mx6s_start_streaming enterted");
 
 	/*
 	 * I didn't manage to properly enable/disable
@@ -999,8 +982,6 @@ static int mx6s_start_streaming(struct vb2_queue *vq, unsigned int count)
 					GFP_DMA | GFP_KERNEL);
 	if (!csi_dev->discard_buffer)
 		return -ENOMEM;
-
-	//pr_info("mx6s_configure_csi=> h3d: buffer allocated");
 
 	spin_lock_irqsave(&csi_dev->slock, flags);
 
@@ -1039,7 +1020,6 @@ static int mx6s_start_streaming(struct vb2_queue *vq, unsigned int count)
 
 	spin_unlock_irqrestore(&csi_dev->slock, flags);
 
-	//pr_info("mx6s_configure_csi=> h3d: streaming started, enable csi");
 	return mx6s_csi_enable(csi_dev);
 }
 
@@ -1462,7 +1442,6 @@ static int mx6s_vidioc_qbuf(struct file *file, void *priv,
 	struct mx6s_csi_dev *csi_dev = video_drvdata(file);
 
 	WARN_ON(priv != file->private_data);
-	//dev_info(csi_dev->dev, "-> mx6s_vidioc_Qbuf runs #%d\n", p->index);
 
 	return vb2_qbuf(&csi_dev->vb2_vidq, p);
 }
@@ -1473,7 +1452,6 @@ static int mx6s_vidioc_dqbuf(struct file *file, void *priv,
 	struct mx6s_csi_dev *csi_dev = video_drvdata(file);
 
 	WARN_ON(priv != file->private_data);
-	//dev_info(csi_dev->dev, "=> mx6s_vidioc_DQbuf runs #%d\n", p->index);
 
 	return vb2_dqbuf(&csi_dev->vb2_vidq, p, file->f_flags & O_NONBLOCK);
 }
@@ -1492,7 +1470,6 @@ static int mx6s_vidioc_enum_fmt_vid_cap(struct file *file, void  *priv,
 
 	WARN_ON(priv != file->private_data);
 
-	//dev_info(csi_dev->dev, "mx6s_vidioc_enum_fmt_vid_cap\n");
 	ret = v4l2_subdev_call(sd, pad, enum_mbus_code, NULL, &code);
 	if (ret < 0) {
 		/* no more formats */
@@ -1538,8 +1515,6 @@ static int mx6s_vidioc_try_fmt_vid_cap(struct file *file, void *priv,
 	}
 
 	v4l2_fill_mbus_format(&format.format, pix, fmt->mbus_code);
-
-	//dev_info(csi_dev->dev, "h3d:mx6s_vidioc_try_fmt_vid_cap setting format.\n");
 
 	ret = v4l2_subdev_call(sd, pad, set_fmt, NULL, &format);
 	v4l2_fill_pix_format(pix, &format.format);
@@ -1589,11 +1564,6 @@ static int mx6s_vidioc_g_fmt_vid_cap(struct file *file, void *priv,
 				    struct v4l2_format *f)
 {
 	struct mx6s_csi_dev *csi_dev = video_drvdata(file);
-
-	//dev_info(csi_dev->dev, "h3d:mx6s_vidioc_g_fmt_vid_cap getting format.\n");
-	dev_info(csi_dev->dev, "h3d:mx6s_vidioc_g_fmt_vid_cap return %dx%d, '%4.6s'.\n", 
-		csi_dev->pix.width, csi_dev->pix.height, (char *)&csi_dev->fmt->name);
-
 	WARN_ON(priv != file->private_data);
 
 	f->fmt.pix = csi_dev->pix;

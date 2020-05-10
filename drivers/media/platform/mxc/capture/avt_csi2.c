@@ -1,22 +1,8 @@
-/*
- * Allied Vision CSI2 Camera
- *
- * This program is free software; you may redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; version 2 of the License.
- *
- * THE SOFTWARE IS PRELIMINARY AND STILL IN TESTING AND VERIFICATION PHASE AND IS PROVIDED ON AN “AS IS” AND “AS AVAILABLE” BASIS AND IS BELIEVED TO CONTAIN DEFECTS.
- * A PRIMARY PURPOSE OF THIS EARLY ACCESS IS TO OBTAIN FEEDBACK ON PERFORMANCE AND THE IDENTIFICATION OF DEFECT SOFTWARE, HARDWARE AND DOCUMENTATION.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
- * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
- * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- *
+/* 
+ * H3D Inc. 
+ * This driver is writen based on Allied Vision CSI2 driver, beta version
+ * This driver is target at Allied Vision camera Alvium 1500 C-500m/c, which is based on 5M-pixel On Semiconductor AR0521SR sensor
+ * Created and Modified by Yuefeng, 05/10/2020
  */
 
 #include <linux/delay.h>
@@ -1312,7 +1298,7 @@ static int avt_csi2_set_fmt(struct v4l2_subdev *sd,
 	sel.target = V4L2_SEL_TGT_CROP;
 	sel.r = priv->frmp.r;
 
-	avt_info(sd, "avt formate setting info: sel:(%d, %d, %d, %d)", sel.r.left, sel.r.top, sel.r.width, sel.r.height);
+	//avt_info(sd, "avt formate setting info: sel:(%d, %d, %d, %d)", sel.r.left, sel.r.top, sel.r.width, sel.r.height);
 
 	avt_set_selection(sd, NULL, &sel);
 
@@ -4437,8 +4423,8 @@ static int avt_read_fmt_from_device(struct v4l2_subdev *sd, uint32_t *fmt)
 
 	switch (avt_img_fmt) {
 		case	MIPI_DT_RGB888:
-			avt_img_fmt = MEDIA_BUS_FMT_RGB888_1X24;
-			//avt_img_fmt = MEDIA_BUS_FMT_RGB888_1X32_PADHI;
+			//avt_img_fmt = MEDIA_BUS_FMT_RGB888_1X24;
+			avt_img_fmt = MEDIA_BUS_FMT_RGB888_1X32_PADHI;
 			break;
 		case	MIPI_DT_RGB565:
 			avt_img_fmt = MEDIA_BUS_FMT_RGB565_1X16;
@@ -4967,7 +4953,8 @@ static int avt_csi2_probe(struct i2c_client *client,
 	format.format.width = 2592;
 	format.format.height = 1944;
 	format.which = V4L2_SUBDEV_FORMAT_ACTIVE;
-	format.format.code = MEDIA_BUS_FMT_RGB888_1X32_PADHI;//MEDIA_BUS_FMT_RGB888_1X24;
+	format.format.code = MEDIA_BUS_FMT_RGB888_1X32_PADHI;
+	//format.format.code = MEDIA_BUS_FMT_RGB888_1X24; 
 	avt_csi2_set_fmt(&priv->subdev, NULL, &format);
 
 	dev_info(&client->dev, "sensor %s registered\n",
